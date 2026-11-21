@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mars Rocket | Oliver's Projects</title>
+<link rel="icon" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@600;700&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/*
+VOICE: engineering design review crossed with launch control, confident and clear
+IDEA: a CAD workstation: model viewport, parts list and requirements, then a flight sim to Mars
+PICTURE: the 3D rocket fills the viewport on a blueprint grid; flies to a red planet
+COLOUR and TYPE: graphite ground, titanium silver, Mars red accent, flame orange; Chakra Petch + Inter
+LAYOUT: top bar, viewport left with tool overlays, tabbed side panel right; stacks under 900px
+*/
+:root{color-scheme:dark;--bg:#0e1116;--panel:#151a22;--line:#262e3a;--ink:#eef1f5;--muted:#97a1b2;--ti:#c9ced6;--mars:#d4512a;--flame:#ff8a2a;--ok:#5fd08a;--bad:#ff6b5b}
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Inter,system-ui,sans-serif;display:flex;flex-direction:column;overflow-x:clip}
+.top{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;padding:12px 18px;border-bottom:1px solid var(--line)}
+.top h1{font:700 26px/1.1 "Chakra Petch",sans-serif;margin:0}
+.top h1 em{font-style:normal;color:var(--mars)}
+.top p{margin:0;color:var(--muted);font-size:14px}
+.back{color:var(--ti);text-decoration:none;font-weight:600;font-size:14px;align-self:center;padding:8px 0}.back:hover{color:#fff}
+.app{flex:1;display:grid;grid-template-columns:minmax(0,1fr) 390px;min-height:0}
+.view{position:relative;min-height:0;background:radial-gradient(ellipse at 50% 30%,#1a2130,#0b0e13)}
+#scene{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.tools{position:absolute;top:12px;left:12px;right:12px;display:flex;gap:8px;flex-wrap:wrap;pointer-events:none}
+.seg{display:flex;background:rgba(21,26,34,.9);border:1px solid var(--line);border-radius:10px;overflow:hidden;pointer-events:auto}
+.seg button{border:0;border-radius:0;background:none;min-height:36px;padding:0 11px;font:600 13px Inter,sans-serif;color:var(--muted)}
+.seg button[aria-pressed=true]{background:#2a3342;color:var(--ink)}
+.seg label{display:flex;align-items:center;gap:8px;padding:0 12px;font-size:13px;color:var(--muted)}
+input[type=range]{width:110px;accent-color:var(--mars)}
+.tip{position:absolute;pointer-events:none;background:#000c;border:1px solid var(--line);padding:4px 9px;border-radius:7px;font-size:13px;white-space:nowrap;display:none;z-index:2}
+.hud{position:absolute;bottom:14px;left:14px;font:700 16px "Chakra Petch",sans-serif;color:var(--flame);pointer-events:none;text-shadow:0 1px 4px #000}
+.hud span{display:block;font:400 13px Inter,sans-serif;color:var(--ti)}
+aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;border:0;border-radius:0;background:none;min-height:46px;font:700 15px "Chakra Petch",sans-serif;color:var(--muted);border-bottom:2px solid transparent}
+.tabs button[aria-selected=true]{color:var(--ink);border-bottom-color:var(--mars)}
+.pane{padding:16px;overflow-y:auto;flex:1}
+.pane[hidden]{display:none}
+h2{font:700 19px/1.2 "Chakra Petch",sans-serif;margin:0 0 10px}
+h3{font:600 15px Inter,sans-serif;margin:18px 0 8px}
+.note{color:var(--muted);font-size:13px;margin:8px 0 0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--muted);font-weight:600;padding:6px 4px;border-bottom:1px solid var(--line)}
+td{padding:7px 4px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:#1c2330}
+tbody tr.sel{background:#24304a}
+td small{display:block;color:var(--muted)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:16px}
+.stat{background:#10141b;border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.stat b{display:block;font:700 22px/1.1 "Chakra Petch",sans-serif;white-space:nowrap}
+.stat span{font-size:12px;color:var(--muted)}
+.req{border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:10px;background:#10141b}
+.req h3{margin:0 0 4px;display:flex;justify-content:space-between;gap:8px}
+.req h3 i{font-style:normal;font-size:12px;color:var(--ok);white-space:nowrap}
+.req p{margin:0;font-size:14px;color:#c9d0db}
+button{font:700 15px "Chakra Petch",sans-serif;min-height:44px;padding:0 16px;border-radius:10px;border:1px solid #3a4454;background:#1d2430;color:var(--ink);cursor:pointer}
+button:hover{background:#262f3d}
+button:focus-visible{outline:3px solid #7fb8ff;outline-offset:2px}
+button:disabled{opacity:.4;cursor:default}
+button.go{background:var(--mars);border-color:var(--mars)}
+button.go:hover{background:#e2663e}
+button.ab[aria-pressed=true]{background:#3b7bff;border-color:#7fb8ff}
+.btns{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 14px}
+.btns button{flex:1}
+.g{display:grid;grid-template-columns:7em minmax(0,1fr) 3.4em;gap:10px;align-items:center;font-size:13px;color:var(--muted);margin-bottom:8px}
+.g b{color:var(--ink);text-align:right;white-space:nowrap}
+.bar{height:10px;background:#0a0d12;border-radius:6px;overflow:hidden}
+.bar i{display:block;height:100%;width:100%;border-radius:6px;background:linear-gradient(90deg,#ffb347,var(--flame))}
+.bar.u i{background:linear-gradient(90deg,#9fd3ff,#3b7bff)}
+.bar.c i{background:linear-gradient(90deg,#e7a08a,var(--mars))}
+.read{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.phases{list-style:none;margin:0;padding:0}
+.phases li{padding:6px 0 6px 22px;position:relative;color:var(--muted);font-size:14px}
+.phases li::before{content:"";position:absolute;left:4px;top:13px;width:9px;height:9px;border-radius:50%;border:2px solid #4a5466}
+.phases li.done{color:#c9d0db}.phases li.done::before{background:var(--ok);border-color:var(--ok)}
+.phases li.now{color:var(--ink);font-weight:600}.phases li.now::before{background:var(--flame);border-color:var(--flame)}
+.result{margin-top:12px;padding:12px;border-radius:10px;font-size:14px;display:none}
+.result.ok{display:block;background:#143322;border:1px solid #2c6b45}
+.result.bad{display:block;background:#3a1714;border:1px solid #7a2e26}
+@media(max-width:900px){
+  body{display:block}
+  .app{grid-template-columns:minmax(0,1fr)}
+  .view{height:62vh;min-height:380px}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  .pane{overflow:visible}
+}
+@media(max-width:480px){.read{grid-template-columns:repeat(2,minmax(0,1fr))}input[type=range]{width:80px}}
+</style>
+</head>
+<body>
+<div class="top">
+  <a class="back" href="index.html">← Oliver's Projects</a>
+  <h1>Ares Heavy <em>Mars</em></h1>
+  <p>Uncrewed Mars cargo launcher · 3D design prototype</p>
+</div>
+<div class="app">
+  <div class="view" id="view">
+    <canvas id="scene" aria-label="3D CAD model of the Ares Heavy rocket"></canvas>
+    <div class="tools">
+      <div class="seg" id="views">
+        <button data-v="iso" aria-pressed="true">Iso</button><button data-v="front" aria-pressed="false">Front</button><button data-v="side" aria-pressed="false">Side</button><button data-v="top" aria-pressed="false">Top</button>
+      </div>
+      <div class="seg" id="modes">
+        <button data-m="shaded" aria-pressed="true">Shaded</button><button data-m="wire" aria-pressed="false">Wire</button><button data-m="xray" aria-pressed="false">X-ray</button>
+      </div>
+      <div class="seg"><label for="explode">Explode <input id="explode" type="range" min="0" max="1" step="0.01" value="0"></label></div>
+    </div>
+    <div class="tip" id="tip"></div>
+    <div class="hud" id="hud">DESIGN MODE<span>Drag to rotate · scroll or pinch to zoom · tap a part</span></div>
+  </div>
+  <aside>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-t="design" aria-selected="true">Design</button>
+      <button role="tab" data-t="req" aria-selected="false">Requirements</button>
+      <button role="tab" data-t="mission" aria-selected="false">Mission</button>
+    </div>
+    <section class="pane" id="p-design">
+      <h2>Parts list</h2>
+      <div class="stats" id="stats"></div>
+      <table><thead><tr><th>Part</th><th class="n">Qty</th><th class="n">Mass (t)</th></tr></thead><tbody id="bom"></tbody></table>
+      <p class="note">Masses include propellant where shown. Figures are prototype estimates for illustration and have not been verified by engineers.</p>
+    </section>
+    <section class="pane" id="p-req" hidden>
+      <h2>Requirements check</h2>
+      <div id="reqs"></div>
+    </section>
+    <section class="pane" id="p-mission" hidden>
+      <h2>Mission: Earth to Mars</h2>
+      <div class="btns">
+        <button class="go" id="launch">Launch</button>
+        <button class="ab" id="ab" aria-pressed="false" disabled>Afterburner</button>
+        <button id="reset">Reset</button>
+      </div>
+      <div class="g">Boosters<div class="bar"><i id="fb"></i></div><b id="tb">100%</b></div>
+      <div class="g">Core stage<div class="bar c"><i id="fc"></i></div><b id="tc">100%</b></div>
+      <div class="g">Upper stage<div class="bar u"><i id="fu"></i></div><b id="tu">100%</b></div>
+      <div class="read">
+        <div class="stat"><b id="rSpeed">0.0</b><span>Speed km/s</span></div>
+        <div class="stat"><b id="rAlt">0</b><span id="rAltL">Altitude km</span></div>
+        <div class="stat"><b id="rDay">0</b><span>Mission day</span></div>
+      </div>
+      <ul class="phases" id="phases"></ul>
+      <div class="result" id="result"></div>
+      <p class="note">Afterburner gives +35% thrust but burns fuel 60% faster. A short blast is fine. Leave it on too long and the upper stage runs dry before Mars.</p>
+    </section>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const view=$('view'),canvas=$('scene');
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.shadowMap.enabled=true;
+const scene=new THREE.Scene();
+const SKY=new THREE.Color(0x0d1426);
+scene.background=SKY.clone();
+const fog=new THREE.Fog(0x0d1426,90,260);scene.fog=fog;
+const camera=new THREE.PerspectiveCamera(40,1,0.1,3000);
+
+// Environment for shiny titanium (canvas gradient, prefiltered)
+{const c=document.createElement('canvas');c.width=256;c.height=128;const x=c.getContext('2d'),gr=x.createLinearGradient(0,0,0,128);
+gr.addColorStop(0,'#cfd6e4');gr.addColorStop(.45,'#7d8799');gr.addColorStop(.55,'#3a2a22');gr.addColorStop(1,'#120c0a');x.fillStyle=gr;x.fillRect(0,0,256,128);
+x.fillStyle='#fff';x.fillRect(40,18,50,10);x.fillRect(170,30,30,8);
+const t=new THREE.CanvasTexture(c);t.mapping=THREE.EquirectangularReflectionMapping;t.encoding=THREE.sRGBEncoding;
+try{const pm=new THREE.PMREMGenerator(renderer);scene.environment=pm.fromEquirectangular(t).texture;pm.dispose();}catch(e){}}
+
+scene.add(new THREE.HemisphereLight(0x9fb4ff,0x20140a,.5));
+const sun=new THREE.DirectionalLight(0xffffff,2.3);sun.position.set(20,35,16);sun.castShadow=true;
+sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-18,right:18,top:36,bottom:-4,far:90});scene.add(sun);
+const rim=new THREE.DirectionalLight(0x7fa8ff,1.1);rim.position.set(-20,12,-15);scene.add(rim);
+const flameLight=new THREE.PointLight(0xff7a1a,0,50);scene.add(flameLight);
+
+// Stars
+{const n=1800,pos=new Float32Array(n*3);
+for(let i=0;i<n;i++){const v=new THREE.Vector3().randomDirection?new THREE.Vector3().randomDirection():new THREE.Vector3(Math.random()-.5,Math.random()-.5,Math.random()-.5).normalize();v.multiplyScalar(1400+Math.random()*400);pos.set([v.x,v.y,v.z],i*3);}
+const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.BufferAttribute(pos,3));
+scene.add(new THREE.Points(g,new THREE.PointsMaterial({color:0xffffff,size:1.3,sizeAttenuation:false,fog:false})));}
+
+// Materials (cloned per mesh so parts can highlight)
+const MAT={
+ white:()=>new THREE.MeshStandardMaterial({color:0xf2f4f7,roughness:.45,metalness:.1}),
+ ti:()=>new THREE.MeshStandardMaterial({color:0xc9ced6,roughness:.16,metalness:1}),
+ tiDark:()=>new THREE.MeshStandardMaterial({color:0x8a919c,roughness:.3,metalness:1}),
+ red:()=>new THREE.MeshStandardMaterial({color:0xa8320f,roughness:.5,metalness:.1}),
+ black:()=>new THREE.MeshStandardMaterial({color:0x1b1f27,roughness:.6,metalness:.4}),
+ nozzle:()=>new THREE.MeshStandardMaterial({color:0x3a3530,roughness:.35,metalness:.9,side:THREE.DoubleSide}),
+ niobium:()=>new THREE.MeshStandardMaterial({color:0x6d6a7a,roughness:.25,metalness:1,side:THREE.DoubleSide}),
+ gold:()=>new THREE.MeshStandardMaterial({color:0xd4a32a,roughness:.3,metalness:.9}),
+ panel:()=>new THREE.MeshStandardMaterial({color:0x1d2f5a,roughness:.3,metalness:.6}),
+ steel:()=>new THREE.MeshStandardMaterial({color:0x5b6272,roughness:.5,metalness:.7}),
+ bay:()=>new THREE.MeshStandardMaterial({color:0xe9ecf1,roughness:.5,metalness:.1,side:THREE.DoubleSide})
+};
+const mesh=(geo,mat,x=0,y=0,z=0)=>{const m=new THREE.Mesh(geo,MAT[mat]());m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;return m;};
+const bellGeo=(r,h,r0=.35)=>{const p=[];for(let i=0;i<=12;i++){const t=i/12;p.push(new THREE.Vector2(r*r0+r*(1-r0)*t**1.6,-h*t));}return new THREE.LatheGeometry(p,40);};
+
+// Parts registry: each part is a group with an explode offset
+const P={};
+const part=(id,parent,off,build)=>{const g=new THREE.Group();build(g);g.userData={part:id,base:new THREE.Vector3(),off:new THREE.Vector3(...off)};
+ g.traverse(o=>{if(o.isMesh&&!o.material.isMeshBasicMaterial)o.userData.part=id;});parent.add(g);(P[id]=P[id]||[]).push(g);return g;};
+
+// Flames
+const flames=[];
+const makeFlame=(parent,x,y,z,r,len,stage)=>{const g=new THREE.Group();
+ const mk=(rr,ll,c,yy)=>{const m=new THREE.Mesh(new THREE.ConeGeometry(rr,ll,24,1,true),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false}));m.rotation.x=Math.PI;m.position.y=yy;g.add(m);return m;};
+ const o=mk(r,len,0xffa040,-len/2),i=mk(r*.55,len*.6,0xfff2c0,-len*.3);
+ g.position.set(x,y,z);g.visible=false;parent.add(g);flames.push({g,o,i,stage});return g;};
+
+// ---- Build rocket (1 unit = 2.5 m) ----
+const R=1.2,BASE=1.5;
+const rocket=new THREE.Group();rocket.position.y=BASE;scene.add(rocket);
+const coreStage=new THREE.Group(),upperStage=new THREE.Group();rocket.add(coreStage,upperStage);
+
+part('coreEng',coreStage,[0,-3.5,0],g=>{
+ g.add(mesh(new THREE.CylinderGeometry(R,R*1.05,1.2,64),'black',0,1.4,0));
+ [[0,0],[.62,0],[-.62,0],[0,.62],[0,-.62]].forEach(([x,z])=>{g.add(mesh(bellGeo(.32,1.2),'nozzle',x,.8,z));makeFlame(g,x,-.4,z,.4,8,'core');});
+});
+part('core',coreStage,[0,0,0],g=>{
+ g.add(mesh(new THREE.CylinderGeometry(R,R,14,64),'white',0,9,0));
+ [3.5,6.5,9.5,12.5,15.3].forEach(y=>g.add(mesh(new THREE.CylinderGeometry(R+.02,R+.02,.35,64),'red',0,y,0)));
+ g.add(mesh(new THREE.CylinderGeometry(R+.05,R+.05,.25,64),'tiDark',0,2.05,0));
+});
+part('inter',coreStage,[0,1.2,0],g=>{g.add(mesh(new THREE.CylinderGeometry(R,R,1,64,1,true),'black',0,16.5,0));g.children[0].material.side=THREE.DoubleSide;g.children[0].castShadow=false;});
+part('upper',upperStage,[0,2.6,0],g=>{
+ g.add(mesh(bellGeo(.7,1.3,.3),'nozzle',0,17.15,0));makeFlame(g,0,15.85,0,.6,7,'upper');
+ g.add(mesh(new THREE.CylinderGeometry(R,R,4,64),'white',0,19.1,0));
+ g.add(mesh(new THREE.CylinderGeometry(R+.02,R+.02,.3,64),'red',0,18.2,0));
+ g.add(mesh(new THREE.CylinderGeometry(R+.05,R+.05,.25,64),'tiDark',0,21.1,0));
+});
+part('bay',upperStage,[0,4.2,0],g=>{const m=mesh(new THREE.CylinderGeometry(R,R,2,64,1,true),'bay',0,22.2,0);m.castShadow=false;g.add(m);});
+part('lander',upperStage,[0,7.2,0],g=>{
+ g.add(mesh(new THREE.CylinderGeometry(.62,.7,.6,6),'gold',0,22,0));
+ g.add(mesh(new THREE.CylinderGeometry(.35,.62,.35,6),'gold',0,22.45,0));
+ const dish=mesh(new THREE.SphereGeometry(.3,20,10,0,Math.PI*2,0,Math.PI/2.5),'tiDark',0,22.7,0);dish.material.side=THREE.DoubleSide;g.add(dish);
+ [-1,1].forEach(s=>g.add(mesh(new THREE.BoxGeometry(.5,.04,.32),'panel',s*.92,22.2,0)));
+ for(let k=0;k<4;k++){const a=k*Math.PI/2+Math.PI/4;const l=mesh(new THREE.CylinderGeometry(.03,.03,.8,8),'tiDark',Math.cos(a)*.7,21.55,Math.sin(a)*.7);l.rotation.set(Math.sin(a)*.5,0,-Math.cos(a)*.5);g.add(l);
+  g.add(mesh(new THREE.CylinderGeometry(.09,.09,.04,12),'tiDark',Math.cos(a)*.88,21.22,Math.sin(a)*.88));}
+});
+part('nose',upperStage,[0,10,0],g=>{
+ g.add(mesh(new THREE.CylinderGeometry(R+.05,R+.05,.3,64),'ti',0,23.35,0));
+ g.add(mesh(new THREE.ConeGeometry(R,7.5,96,8),'ti',0,23.2+3.75,0));
+ g.add(mesh(new THREE.CylinderGeometry(0,.05,1.5,16),'ti',0,30.95+.75-.05,0));
+});
+
+const boosters=[];
+for(let i=0;i<4;i++){
+ const a=i*Math.PI/2+Math.PI/4,d=R+.78,br=.7,dir=[Math.cos(a),0,Math.sin(a)];
+ const bg=part('booster',rocket,[dir[0]*4,0,dir[2]*4],g=>{
+  g.add(mesh(new THREE.CylinderGeometry(br,br,11,48),'white',0,7.1,0));
+  [4,7.5,10.8].forEach(y=>g.add(mesh(new THREE.CylinderGeometry(br+.02,br+.02,.3,48),'red',0,y,0)));
+  g.add(mesh(new THREE.CylinderGeometry(br+.04,br+.04,.2,48),'tiDark',0,12.6,0));
+  g.add(mesh(new THREE.ConeGeometry(br,3.4,64),'ti',0,12.6+1.7,0));
+  g.add(mesh(new THREE.CylinderGeometry(br,br*1.08,.8,48),'black',0,1.2,0));
+  g.add(mesh(bellGeo(.5,1.4),'nozzle',0,.8,0));
+  const sh=new THREE.Shape();sh.moveTo(0,0);sh.lineTo(1.5,-.7);sh.lineTo(1.5,.4);sh.lineTo(0,2.8);sh.lineTo(0,0);
+  const fin=mesh(new THREE.ExtrudeGeometry(sh,{depth:.08,bevelEnabled:false}),'black');
+  fin.position.set(Math.cos(a)*br,1.6,Math.sin(a)*br);fin.rotation.y=-a;g.add(fin);
+  [3,11.5].forEach(y=>{const s=mesh(new THREE.CylinderGeometry(.08,.08,.9,8),'steel',-Math.cos(a)*.62,y,-Math.sin(a)*.62);s.rotation.set(0,-a,Math.PI/2);g.add(s);});
+ });
+ bg.userData.base.set(dir[0]*d,0,dir[2]*d);bg.position.copy(bg.userData.base);
+ part('skirt',bg,[0,-2.2,0],g=>{g.add(mesh(new THREE.CylinderGeometry(.52,.52,.12,32),'niobium',0,-.6,0));
+  const s=mesh(bellGeo(.82,.8,.62),'niobium',0,-.62,0);g.add(s);});
+ makeFlame(bg,0,-1.4,0,.65,10,'booster');
+ boosters.push(bg);
+}
+
+// Ground, pad, tower
+const site=new THREE.Group();scene.add(site);
+const ground=mesh(new THREE.CircleGeometry(260,64),'black');ground.material.color.set(0x0a0d14);ground.material.metalness=0;ground.material.roughness=1;ground.material.envMapIntensity=.08;ground.rotation.x=-Math.PI/2;site.add(ground);
+const grid=new THREE.GridHelper(120,48,0x3a4a66,0x1f2838);grid.position.y=.02;site.add(grid);
+const pad=mesh(new THREE.CylinderGeometry(7,7.6,.6,64),'steel',0,-.29,0);pad.material.color.set(0x2a2f3a);pad.material.envMapIntensity=.2;site.add(pad);
+for(let y=0;y<32;y+=2)site.add(mesh(new THREE.BoxGeometry(1.5,.12,1.5),'steel',-7,y,0));
+[[-.7,-.7],[.7,-.7],[-.7,.7],[.7,.7]].forEach(([x,z])=>site.add(mesh(new THREE.BoxGeometry(.12,32,.12),'steel',-7+x,16,z)));
+const arm=mesh(new THREE.BoxGeometry(4,.3,.5),'steel',-4.6,20,0);site.add(arm);
+
+// Planets
+const planetTex=(base,spots,cap)=>{const c=document.createElement('canvas');c.width=512;c.height=256;const x=c.getContext('2d');x.fillStyle=base;x.fillRect(0,0,512,256);
+ for(let i=0;i<260;i++){x.fillStyle=spots[i%spots.length];x.globalAlpha=.25+Math.random()*.4;x.beginPath();x.ellipse(Math.random()*512,30+Math.random()*196,6+Math.random()*40,4+Math.random()*16,0,0,Math.PI*2);x.fill();}
+ x.globalAlpha=1;if(cap){x.fillStyle=cap;x.fillRect(0,0,512,14);x.fillRect(0,244,512,12);}
+ const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;return t;};
+const mars=new THREE.Mesh(new THREE.SphereGeometry(40,64,32),new THREE.MeshStandardMaterial({map:planetTex('#b5502a',['#7a3018','#d9783f','#5e2412','#c9643a'],'#f1e7de'),roughness:1}));
+const earth=new THREE.Mesh(new THREE.SphereGeometry(14,48,24),new THREE.MeshStandardMaterial({map:planetTex('#1f5fae',['#3d8a3a','#2f6e2c','#e9eef5','#c6a56a'],'#f4f8ff'),roughness:.8}));
+mars.visible=earth.visible=false;scene.add(mars,earth);
+
+// Smoke
+const SM=500,sPos=new Float32Array(SM*3).fill(-999),sD=Array.from({length:SM},()=>({l:0,v:new THREE.Vector3()}));
+const sGeo=new THREE.BufferGeometry();sGeo.setAttribute('position',new THREE.BufferAttribute(sPos,3));
+const sTex=(()=>{const c=document.createElement('canvas');c.width=c.height=64;const x=c.getContext('2d'),gr=x.createRadialGradient(32,32,0,32,32,32);gr.addColorStop(0,'rgba(255,255,255,.9)');gr.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=gr;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);})();
+const smoke=new THREE.Points(sGeo,new THREE.PointsMaterial({size:4,map:sTex,transparent:true,opacity:.35,depthWrite:false,color:0xd8dce6}));scene.add(smoke);let sI=0;
+
+// ---- Parts data ----
+const BOM=[
+ {id:'nose',name:'Titanium nose cone',mat:'Ti-6Al-4V titanium, 12 mm wall, needle tip',qty:1,mass:6.8,dim:'6.0 m Ø × 20 m'},
+ {id:'lander',name:'Mars cargo lander (uncrewed)',mat:'Al-Li frame, gold foil insulation',qty:1,mass:9.5,dim:'3.5 m Ø'},
+ {id:'bay',name:'Payload bay',mat:'Carbon composite',qty:1,mass:2.1,dim:'6.0 m Ø × 5 m'},
+ {id:'upper',name:'Upper stage + vacuum engine',mat:'Al-Li tank · 210 t methane/oxygen',qty:1,mass:224,dim:'6.0 m Ø × 13 m',prop:210},
+ {id:'inter',name:'Interstage',mat:'Carbon composite',qty:1,mass:3.2,dim:'6.0 m Ø × 2.5 m'},
+ {id:'core',name:'Core stage fuel tank',mat:'Al-Li tank · 1,250 t methane/oxygen',qty:1,mass:1328,dim:'6.0 m Ø × 35 m',prop:1250},
+ {id:'coreEng',name:'Core engines',mat:'Inconel, copper chamber · 2.6 MN each',qty:5,mass:8,dim:'1.6 m nozzle'},
+ {id:'booster',name:'Strap-on boosters',mat:'Al-Li tank · 330 t propellant each · 6.5 MN each',qty:4,mass:1424,dim:'3.5 m Ø × 38 m',prop:1320},
+ {id:'skirt',name:'Afterburner nozzle skirts',mat:'Niobium C-103 alloy',qty:4,mass:2.4,dim:'4.1 m exit Ø'}
+];
+const total=BOM.reduce((s,b)=>s+b.mass,0),prop=BOM.reduce((s,b)=>s+(b.prop||0),0),thrust=5*2.6+4*6.5,tw=thrust*1e6/(total*1000*9.81);
+const fmt=n=>n.toLocaleString('en-GB',{maximumFractionDigits:1});
+$('stats').innerHTML=[[fmt(total),'Lift-off mass (t)'],[Math.round(prop/total*100)+'%','of it is fuel'],[thrust+' MN','Lift-off thrust'],[tw.toFixed(2),'Thrust-to-weight']].map(([b,s])=>`<div class="stat"><b>${b}</b><span>${s}</span></div>`).join('');
+$('bom').innerHTML=BOM.map(b=>`<tr data-id="${b.id}"><td>${b.name}<small>${b.mat} · ${b.dim}</small></td><td class="n">${b.qty}</td><td class="n">${fmt(b.mass)}</td></tr>`).join('');
+const REQ=[
+ ['Strong titanium nose','Ti-6Al-4V titanium cone with a 12 mm wall and a needle tip. It stays on all the way to Mars to protect the lander, and the booster tops are titanium too.'],
+ ['Afterburners','Real rockets can\'t have jet-style afterburners because there\'s no air to burn in space. This design gets the same idea with niobium nozzle skirts on each booster and an afterburner boost mode in the mission: +35% thrust for 60% faster fuel burn.'],
+ ['No people','Uncrewed cargo mission. A robotic lander rides in the payload bay. There\'s no crew capsule, no windows and no life support, which saves mass for fuel.'],
+ ['Strong boosters',`Four strap-on boosters give ${4*6.5} MN, two-thirds of the ${thrust} MN lift-off thrust. Each has fins and its own titanium cap.`],
+ ['Loads of fuel',`${fmt(prop)} t of propellant, ${Math.round(prop/total*100)}% of the rocket's lift-off mass, split between the boosters, core and upper stage.`]
+];
+$('reqs').innerHTML=REQ.map(([h,p])=>`<div class="req"><h3>${h}<i>✓ Met</i></h3><p>${p}</p></div>`).join('');
+
+// ---- Selection & display modes ----
+let sel=null,hover=null;
+const allMeshes=()=>{const a=[];rocket.traverse(o=>{if(o.isMesh&&o.userData.part)a.push(o);});scene.children.forEach(c=>{if(c!==rocket)c.traverse(o=>{if(o.isMesh&&o.userData.part&&!a.includes(o))a.push(o);});});return a;};
+const paint=()=>{allMeshes().forEach(m=>{const id=m.userData.part;m.material.emissive.set(id===sel?0x2d6bff:id===hover?0x23324d:0x000000);m.material.emissiveIntensity=id===sel?.55:1;});
+ document.querySelectorAll('#bom tr').forEach(r=>r.classList.toggle('sel',r.dataset.id===sel));};
+let mode='shaded';
+const setMode=m=>{mode=m;allMeshes().forEach(o=>{o.material.wireframe=m==='wire';o.material.transparent=m==='xray';o.material.opacity=m==='xray'?.28:1;o.material.depthWrite=m!=='xray';o.material.needsUpdate=true;});
+ document.querySelectorAll('#modes button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));};
+document.querySelectorAll('#modes button').forEach(b=>b.onclick=()=>setMode(b.dataset.m));
+let explodeAmt=0;
+const applyExplode=()=>{Object.values(P).flat().forEach(g=>g.position.copy(g.userData.base).addScaledVector(g.userData.off,explodeAmt));};
+$('explode').oninput=e=>{explodeAmt=+e.target.value;applyExplode();};
+$('bom').onclick=e=>{const r=e.target.closest('tr');if(r){sel=sel===r.dataset.id?null:r.dataset.id;paint();}};
+
+// ---- Camera ----
+const VIEWS={iso:[.75,1.2],front:[Math.PI/2,Math.PI/2],side:[0,Math.PI/2],top:[Math.PI/2,.02]};
+let theta=.75,phi=1.2,dist=62,target=new THREE.Vector3(0,17,0),tY=17,goal=null;
+document.querySelectorAll('#views button').forEach(b=>b.onclick=()=>{goal=VIEWS[b.dataset.v];document.querySelectorAll('#views button').forEach(x=>x.setAttribute('aria-pressed',x===b));});
+let drag=null,pinch=null,moved=0;
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2(),tip=$('tip');
+const pick=e=>{const r=canvas.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);ray.setFromCamera(ndc,camera);
+ const h=ray.intersectObjects(allMeshes().filter(m=>m.visible),false)[0];return h?h.object.userData.part:null;};
+canvas.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY};moved=0;canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener('pointermove',e=>{
+ if(drag&&!pinch){const dx=e.clientX-drag.x,dy=e.clientY-drag.y;moved+=Math.abs(dx)+Math.abs(dy);theta-=dx*.006;phi=Math.min(Math.PI-.05,Math.max(.02,phi-dy*.005));drag={x:e.clientX,y:e.clientY};goal=null;}
+ else if(e.pointerType==='mouse'){const id=pick(e);if(id!==hover){hover=id;paint();}
+  if(id){const r=view.getBoundingClientRect();tip.style.display='block';tip.textContent=BOM.find(b=>b.id===id).name;tip.style.left=(e.clientX-r.left+14)+'px';tip.style.top=(e.clientY-r.top+10)+'px';}else tip.style.display='none';}});
+canvas.addEventListener('pointerup',e=>{if(drag&&moved<6){const id=pick(e);sel=id===sel?null:id;paint();if(id)showTab('design');}drag=null;});
+canvas.addEventListener('pointerleave',()=>{tip.style.display='none';if(hover){hover=null;paint();}});
+canvas.addEventListener('wheel',e=>{e.preventDefault();dist=Math.min(260,Math.max(12,dist*(1+e.deltaY*.001)));},{passive:false});
+const pd=t=>Math.hypot(t[0].clientX-t[1].clientX,t[0].clientY-t[1].clientY);
+canvas.addEventListener('touchstart',e=>{if(e.touches.length===2)pinch=pd(e.touches);},{passive:true});
+canvas.addEventListener('touchmove',e=>{if(e.touches.length===2&&pinch){const d=pd(e.touches);dist=Math.min(260,Math.max(12,dist*pinch/d));pinch=d;}},{passive:true});
+canvas.addEventListener('touchend',()=>pinch=null);
+
+// ---- Tabs ----
+const showTab=t=>{document.querySelectorAll('.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.t===t));
+ ['design','req','mission'].forEach(k=>$('p-'+k).hidden=k!==t);};
+document.querySelectorAll('.tabs button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+
+// ---- Mission ----
+const PH=[['count','Countdown'],['boost','Lift-off: boosters and core firing'],['core','Booster separation, core stage burn'],['upper','Core separation, upper stage to orbit'],['orbit','Earth orbit coast'],['tmi','Trans-Mars injection burn'],['cruise','Cruise to Mars, about 7 months'],['moi','Mars orbit insertion burn'],['arrive','Nose cone off, lander to Mars']];
+$('phases').innerHTML=PH.map(p=>`<li data-p="${p[0]}">${p[1]}</li>`).join('');
+let st;const debris=[];
+const flameOn=(stage,on)=>flames.forEach(f=>{if(f.stage===stage)f.g.visible=on;});
+const detach=(obj,vel,spin)=>{scene.attach(obj);obj.userData.vel=vel;obj.userData.spin=spin;debris.push(obj);};
+const reset=()=>{
+ st={phase:'pad',t:0,y:0,speed:0,fb:100,fc:100,fu:100,ab:false,day:0,moi:0,result:null};
+ debris.length=0;
+ rocket.add(coreStage,upperStage);boosters.forEach(b=>rocket.add(b));
+ upperStage.add(P.lander[0],P.nose[0]);
+ [rocket,coreStage,upperStage,...boosters,P.lander[0],P.nose[0]].forEach(o=>{o.rotation.set(0,0,0);o.scale.set(1,1,1);o.visible=true;});
+ rocket.position.set(0,BASE,0);coreStage.position.set(0,0,0);upperStage.position.set(0,0,0);
+ explodeAmt=+$('explode').value;applyExplode();
+ flames.forEach(f=>f.g.visible=false);flameLight.intensity=0;arm.rotation.y=0;
+ site.visible=smoke.visible=true;mars.visible=earth.visible=false;scene.fog=fog;scene.background.copy(SKY);fog.color.copy(SKY);
+ sD.forEach(d=>d.l=0);sPos.fill(-999);sGeo.attributes.position.needsUpdate=true;
+ target.set(0,17,0);tY=17;dist=62;
+ $('launch').disabled=false;$('ab').disabled=true;$('ab').setAttribute('aria-pressed','false');
+ $('result').className='result';$('explode').disabled=false;
+};
+reset();
+$('reset').onclick=reset;
+$('launch').onclick=()=>{if(st.phase!=='pad')return;$('explode').value=0;explodeAmt=0;applyExplode();$('explode').disabled=true;setMode('shaded');
+ st.phase='count';st.t=0;$('launch').disabled=true;$('ab').disabled=false;goal=VIEWS.iso;dist=70;showTab('mission');};
+$('ab').onclick=()=>{st.ab=!st.ab;$('ab').setAttribute('aria-pressed',st.ab);};
+const finish=(ok,msg)=>{st.result=ok;$('result').className='result '+(ok?'ok':'bad');$('result').textContent=msg;$('ab').disabled=true;st.ab=false;$('ab').setAttribute('aria-pressed','false');flames.forEach(f=>f.g.visible=false);};
+const go=p=>{st.phase=p;st.t=0;};
+
+const startCruise=()=>{
+ debris.forEach(d=>d.visible=false);site.visible=smoke.visible=false;scene.fog=null;scene.background.set(0x000000);
+ rocket.position.set(0,-24,0);st.y=0;target.set(0,0,0);tY=0;dist=40;
+ mars.visible=earth.visible=true;mars.position.set(26,-6,-900);goal=[Math.PI/2+.3,1.35];earth.position.set(-45,-18,5);go('cruise');
+};
+
+const sim=dt=>{
+ const burning=['boost','core','upper','tmi','moi'].includes(st.phase),ab=st.ab&&burning,k=ab?1.35:1,d=ab?1.6:1;
+ st.t+=dt;
+ switch(st.phase){
+  case 'count':arm.rotation.y=-Math.min(st.t/2,1)*1.3;if(st.t>2.3){flameOn('booster',true);flameOn('core',true);}if(st.t>3)go('boost');break;
+  case 'boost':st.fb=Math.max(0,st.fb-10*d*dt);st.speed+=.34*k*dt;
+   if(st.fb===0){flameOn('booster',false);boosters.forEach(b=>{const a=Math.atan2(b.position.z,b.position.x);detach(b,new THREE.Vector3(Math.cos(a)*5,st.speed*6,Math.sin(a)*5),new THREE.Vector3(Math.sin(a)*.7,0,-Math.cos(a)*.7));});go('core');}break;
+  case 'core':st.fc=Math.max(0,st.fc-7*d*dt);st.speed+=.3*k*dt;
+   if(st.fc===0){flameOn('core',false);detach(coreStage,new THREE.Vector3(0,st.speed*5,0),new THREE.Vector3(.25,0,.15));flameOn('upper',true);go('upper');}break;
+  case 'upper':st.fu=Math.max(0,st.fu-5*d*dt);st.speed+=.25*k*dt;if(st.speed>=7.8){flameOn('upper',false);go('orbit');}break;
+  case 'orbit':if(st.t>2.5){flameOn('upper',true);go('tmi');}break;
+  case 'tmi':st.fu=Math.max(0,st.fu-5*d*dt);st.speed+=.25*k*dt;
+   if(st.speed>=11.4){flameOn('upper',false);startCruise();}else if(st.fu===0){finish(false,'Out of fuel in Earth orbit. The upper stage never reached Mars speed. Try using the afterburner less.');go('fail');}break;
+  case 'cruise':st.day=Math.min(210,st.day+dt*210/12);st.speed=11.4-st.day/210*8.8;
+   mars.position.z=-900+st.day/210*800;earth.position.set(-45-st.day*.6,-18-st.day*.1,5+st.day*3);mars.rotation.y+=dt*.05;
+   if(st.day>=210){flameOn('upper',true);go('moi');}break;
+  case 'moi':st.fu=Math.max(0,st.fu-5*d*dt);st.moi+=.5*k*dt;mars.rotation.y+=dt*.05;
+   if(st.moi>=1){flameOn('upper',false);go('arrive');detach(P.nose[0],new THREE.Vector3(3,6,2),new THREE.Vector3(.8,.4,.6));}
+   else if(st.fu===0){finish(false,'Out of fuel at Mars. Without the braking burn the rocket flew straight past the planet. Try using the afterburner less.');go('fail');}break;
+  case 'arrive':{mars.rotation.y+=dt*.05;const L=P.lander[0];
+   if(st.t>1.5&&L.parent!==scene)detach(L,new THREE.Vector3(),new THREE.Vector3(0,.3,0));
+   if(L.parent===scene){const p=Math.min(1,(st.t-1.5)/7);L.position.lerpVectors(new THREE.Vector3(0,-2,0),new THREE.Vector3(18,-9,-58),p);L.scale.setScalar(1-p*.85);}
+   if(st.t>9&&st.result===null)finish(true,`Mission success! The lander is on its way down to Mars with ${Math.round(st.fu)}% upper-stage fuel to spare.`);break;}
+ }
+ if(st.phase==='boost'||st.phase==='core'||st.phase==='upper'||st.phase==='orbit'||st.phase==='tmi'){st.y+=st.speed*dt*9;rocket.position.y=BASE+st.y;
+  const f=Math.min(1,st.y/700);scene.background.copy(SKY).lerp(new THREE.Color(0),f);fog.color.copy(scene.background);}
+};
+
+const ui=()=>{
+ $('fb').style.width=st.fb+'%';$('fc').style.width=st.fc+'%';$('fu').style.width=st.fu+'%';
+ $('tb').textContent=st.fb===0&&st.phase!=='pad'?'Sep':Math.round(st.fb)+'%';$('tc').textContent=st.fc===0&&st.phase!=='pad'?'Sep':Math.round(st.fc)+'%';$('tu').textContent=Math.round(st.fu)+'%';
+ $('rSpeed').textContent=st.speed.toFixed(1);
+ const space=['cruise','moi','arrive'].includes(st.phase)||(st.phase==='fail'&&st.day>0);
+ $('rAltL').textContent=space?'To Mars (M km)':'Altitude km';
+ $('rAlt').textContent=space?Math.round(225*(1-st.day/210)):Math.round(st.y*.9);
+ $('rDay').textContent=Math.round(st.day);
+ const idx=PH.findIndex(p=>p[0]===st.phase);
+ document.querySelectorAll('#phases li').forEach((li,i)=>{li.className=st.result===true||(idx>=0&&i<idx)?'done':i===idx?'now':'';});
+ const label=st.phase==='pad'?'DESIGN MODE':st.result===true?'LANDER DEPLOYED':st.result===false?'MISSION FAILED':(PH[idx]||['',''])[1].split(',')[0].toUpperCase();
+ $('hud').innerHTML=`${label}${st.ab&&!$('ab').disabled?' · AFTERBURNER':''}<span>${st.phase==='pad'?'Drag to rotate · scroll or pinch to zoom · tap a part':`Speed ${st.speed.toFixed(1)} km/s · Day ${Math.round(st.day)}`}</span>`;
+};
+
+const emit=(p,n,s)=>{for(let j=0;j<n;j++){const d=sD[sI];d.l=1;d.v.set((Math.random()-.5)*s,-2-Math.random()*3,(Math.random()-.5)*s);sPos.set([p.x+(Math.random()-.5),p.y,p.z+(Math.random()-.5)],sI*3);sI=(sI+1)%SM;}};
+const size=()=>{const w=view.clientWidth,h=view.clientHeight;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<600?52:40;camera.updateProjectionMatrix();};
+const ro=new ResizeObserver(size);ro.observe(view);size();
+
+const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const clock=new THREE.Clock(),wp=new THREE.Vector3();
+const loop=()=>{
+ const dt=Math.min(clock.getDelta(),.05),T=clock.elapsedTime;
+ if(st.phase!=='pad')sim(dt);
+ debris.forEach(o=>{const u=o.userData;if(!u.vel)return;if(o!==P.lander[0]&&site.visible)u.vel.y-=12*dt;o.position.addScaledVector(u.vel,dt);o.rotation.x+=u.spin.x*dt;o.rotation.y+=u.spin.y*dt;o.rotation.z+=u.spin.z*dt;});
+ let lit=false;
+ flames.forEach(f=>{if(!f.g.visible)return;lit=true;const ab=st.ab&&!$('ab').disabled,s=(1+Math.sin(T*40+f.g.id)*.08+Math.random()*.08)*(ab?1.55:1);
+  f.g.scale.set(ab?1.2:1,s*(st.phase==='count'?.7:1.15),ab?1.2:1);f.o.material.color.set(ab?0x7fb8ff:0xffa040);f.i.material.color.set(ab?0xeaf6ff:0xfff2c0);});
+ flameLight.intensity=lit?6+Math.random()*3:0;rocket.getWorldPosition(wp);flameLight.position.set(wp.x,wp.y-2,wp.z);
+ if(lit&&site.visible){emit(wp,st.y<25?6:2,st.y<25?10:2);}
+ for(let i=0;i<SM;i++){const d=sD[i];if(d.l<=0)continue;d.l-=dt*.35;if(sPos[i*3+1]<.6){d.v.y=0;d.v.x*=1.02;d.v.z*=1.02;}
+  sPos[i*3]+=d.v.x*dt;sPos[i*3+1]=Math.max(.4,sPos[i*3+1]+d.v.y*dt);sPos[i*3+2]+=d.v.z*dt;if(d.l<=0)sPos[i*3+1]=-999;}
+ sGeo.attributes.position.needsUpdate=true;
+ if(goal){theta+=(goal[0]-theta)*Math.min(1,dt*5);phi+=(goal[1]-phi)*Math.min(1,dt*5);}
+ else if(st.phase==='pad'&&!drag&&!reduce&&explodeAmt===0&&!sel)theta+=dt*.08;
+ if(site.visible){tY+=((rocket.position.y+(st.phase==='pad'?15.5:22))-tY)*Math.min(1,dt*3);target.set(0,tY,0);}
+ camera.position.set(target.x+dist*Math.sin(phi)*Math.cos(theta),target.y+dist*Math.cos(phi),target.z+dist*Math.sin(phi)*Math.sin(theta));
+ camera.up.set(0,1,0);camera.lookAt(target);
+ ui();renderer.render(scene,camera);requestAnimationFrame(loop);
+};
+loop();
+}
+</script>
+</body>
+</html>
